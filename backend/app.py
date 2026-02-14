@@ -271,8 +271,8 @@ def login():
 @app.get("/applications")
 @jwt_required()
 def list_applications():
-    ident = get_jwt_identity()
-    user_id = ident["user_id"]
+    user_id = int(get_jwt_identity())
+
 
     status = request.args.get("status")
     q = (request.args.get("q") or "").strip().lower()
@@ -295,8 +295,8 @@ def list_applications():
 @app.post("/applications")
 @jwt_required()
 def create_application():
-    ident = get_jwt_identity()
-    user_id = ident["user_id"]
+    user_id = int(get_jwt_identity())
+
 
     data = request.get_json(force=True) or {}
     company = (data.get("company") or "").strip()
@@ -339,8 +339,8 @@ def create_application():
 @app.get("/applications/<int:app_id>")
 @jwt_required()
 def get_application(app_id: int):
-    ident = get_jwt_identity()
-    user_id = ident["user_id"]
+    user_id = int(get_jwt_identity())
+
 
     db = SessionLocal()
     try:
@@ -354,8 +354,8 @@ def get_application(app_id: int):
 @app.put("/applications/<int:app_id>")
 @jwt_required()
 def update_application(app_id: int):
-    ident = get_jwt_identity()
-    user_id = ident["user_id"]
+    user_id = int(get_jwt_identity())
+
 
     data = request.get_json(force=True) or {}
 
@@ -393,8 +393,8 @@ def update_application(app_id: int):
 @app.delete("/applications/<int:app_id>")
 @jwt_required()
 def delete_application(app_id: int):
-    ident = get_jwt_identity()
-    user_id = ident["user_id"]
+    user_id = int(get_jwt_identity())
+
 
     db = SessionLocal()
     try:
@@ -413,8 +413,8 @@ def delete_application(app_id: int):
 @app.get("/applications/<int:app_id>/deliverables")
 @jwt_required()
 def list_deliverables(app_id: int):
-    ident = get_jwt_identity()
-    user_id = ident["user_id"]
+    user_id = int(get_jwt_identity())
+
 
     db = SessionLocal()
     try:
@@ -430,8 +430,8 @@ def list_deliverables(app_id: int):
 @app.post("/applications/<int:app_id>/deliverables")
 @jwt_required()
 def create_deliverable(app_id: int):
-    ident = get_jwt_identity()
-    user_id = ident["user_id"]
+    user_id = int(get_jwt_identity())
+
     data = request.get_json(force=True) or {}
 
     title = (data.get("title") or "").strip()
@@ -471,8 +471,8 @@ def create_deliverable(app_id: int):
 @app.put("/deliverables/<int:deliverable_id>")
 @jwt_required()
 def update_deliverable(deliverable_id: int):
-    ident = get_jwt_identity()
-    user_id = ident["user_id"]
+    user_id = int(get_jwt_identity())
+
     data = request.get_json(force=True) or {}
 
     db = SessionLocal()
@@ -519,8 +519,8 @@ def update_deliverable(deliverable_id: int):
 @app.delete("/deliverables/<int:deliverable_id>")
 @jwt_required()
 def delete_deliverable(deliverable_id: int):
-    ident = get_jwt_identity()
-    user_id = ident["user_id"]
+    user_id = int(get_jwt_identity())
+
 
     db = SessionLocal()
     try:
@@ -551,8 +551,8 @@ def delete_deliverable(deliverable_id: int):
 @app.get("/writing")
 @jwt_required()
 def list_writing():
-    ident = get_jwt_identity()
-    user_id = ident["user_id"]
+    user_id = int(get_jwt_identity())
+
     q = (request.args.get("q") or "").strip().lower()
 
     db = SessionLocal()
@@ -573,8 +573,8 @@ def list_writing():
 @app.post("/writing")
 @jwt_required()
 def create_writing():
-    ident = get_jwt_identity()
-    user_id = ident["user_id"]
+    user_id = int(get_jwt_identity())
+
     data = request.get_json(force=True) or {}
 
     title = (data.get("title") or "").strip()
@@ -605,8 +605,8 @@ def create_writing():
 @app.put("/writing/<int:item_id>")
 @jwt_required()
 def update_writing(item_id: int):
-    ident = get_jwt_identity()
-    user_id = ident["user_id"]
+    user_id = int(get_jwt_identity())
+
     data = request.get_json(force=True) or {}
 
     db = SessionLocal()
@@ -637,8 +637,8 @@ def update_writing(item_id: int):
 @app.delete("/writing/<int:item_id>")
 @jwt_required()
 def delete_writing(item_id: int):
-    ident = get_jwt_identity()
-    user_id = ident["user_id"]
+    user_id = int(get_jwt_identity())
+
 
     db = SessionLocal()
     try:
