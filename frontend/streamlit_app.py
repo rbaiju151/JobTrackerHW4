@@ -319,17 +319,24 @@ with tab[1]:
 
                                         with st.form(f"edit_deliv_{d['id']}"):
                                             title2 = st.text_input("Title", value=d["title"])
-                                            dtype2 = st.selectbox("Type", ["Essay", "Question", "Resume", "Cover Letter", "Form", "Other"],
-                                                                  index=["Essay", "Question", "Resume", "Cover Letter", "Form", "Other"].index(d["dtype"]) if d["dtype"] in ["Essay","Question","Resume","Cover Letter","Form","Other"] else 5)
+                                            dtype2 = st.selectbox(
+                                                "Type",
+                                                ["Essay", "Question", "Resume", "Cover Letter", "Form", "Other"],
+                                                index=["Essay", "Question", "Resume", "Cover Letter", "Form", "Other"].index(d["dtype"])
+                                                if d["dtype"] in ["Essay","Question","Resume","Cover Letter","Form","Other"] else 5
+                                            )
                                             due2 = st.date_input("Due", value=dateparser.isoparse(d["due_date"]).date() if d.get("due_date") else None)
-                                            state2 = st.selectbox("State", ["Not started", "In progress", "Done"],
-                                                                  index=["Not started","In progress","Done"].index(d["state"]) if d["state"] in ["Not started","In progress","Done"] else 0)
+                                            state2 = st.selectbox(
+                                                "State",
+                                                ["Not started", "In progress", "Done"],
+                                                index=["Not started","In progress","Done"].index(d["state"]) if d["state"] in ["Not started","In progress","Done"] else 0
+                                            )
                                             content2 = st.text_area("Content", value=d.get("content") or "", height=120)
                                             is_done2 = st.checkbox("Done", value=bool(d.get("is_done")))
 
-                                            c1, c2 = st.columns([1, 1])
-                                            save = c1.form_submit_button("Save")
-                                            delete = c2.form_submit_button("Delete")
+                                            # ✅ No nested columns here
+                                            save = st.form_submit_button("Save")
+                                            delete = st.form_submit_button("Delete")
 
                                             if save:
                                                 payload = {
@@ -354,6 +361,7 @@ with tab[1]:
                                                     st.rerun()
                                                 else:
                                                     st.error(u.json().get("error", u.text))
+
 
 # ---------------------------
 # Writing bank tab
@@ -398,9 +406,9 @@ with tab[2]:
                             tags2 = st.text_input("Tags", value=w.get("tags") or "")
                             content2 = st.text_area("Content", value=w["content"], height=180)
 
-                            c1, c2 = st.columns([1, 1])
-                            save = c1.form_submit_button("Save")
-                            delete = c2.form_submit_button("Delete")
+                            save = st.form_submit_button("Save")
+                            delete = st.form_submit_button("Delete")
+
 
                             if save:
                                 u = api_put(f"/writing/{w['id']}", json={"title": title2, "tags": tags2, "content": content2})
