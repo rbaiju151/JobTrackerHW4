@@ -110,7 +110,7 @@ if not st.session_state.token:
 # ---------------------------
 # Main UI
 # ---------------------------
-st.title("Job Application Tracker (MVP)")
+st.title("Job Application Tracker")
 
 # Pull meta (limits/statuses)
 meta = {}
