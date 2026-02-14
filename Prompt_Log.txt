@@ -1,0 +1,417 @@
+Prompt 1: Today we are going to spend a bit of time building a cool frontend/backend service. The  idea is to make a site where you can track job/internship applications. For example, you can create a new application, input what you need to do to apply (questions, essays, etc.), due dates, etc. Or you can edit existing applications by updating where you are in the process (applied, interview, offer letter, etc.), and new deliverables/due dates, etc. There should also be a space to have any essays/questions you have written be stored, and any documents relating to the application be uploaded. Ideally there can be a sign in tool that allows multiple users to store this data (limit five job applications per user, 10 users total). To implement this code, we will host out backend on Render.com using Flask and Green Unicorn. The front end can be written for/hosted on Streamlit. The backend code should include a requirements.txt and the frontend code should have a variable that points to the render.com hosting link, that I will add once you generate the code for me. As an experienced software developer, summarize the project requirements back to me, I will then give the go ahead, and we can get to coding
+
+Response 1: Here’s what I understand you want to build (MVP scope, with the constraints you gave):
+
+## Product goal
+
+A web app to **track job/internship applications end-to-end**, including:
+
+* Creating an application entry
+* Tracking **deliverables** (questions, essays, forms, etc.) with due dates
+* Updating application **status** over time (e.g., Drafting → Submitted → Interview → Offer/Reject)
+* Storing **written responses/essays** for reuse
+* Uploading and storing **documents** related to each application
+
+## Users + limits
+
+* **Multi-user sign-in** (so each user only sees their own data)
+* Hard limits:
+
+  * **Max 10 users total** in the system
+  * **Max 5 applications per user**
+
+## Tech + hosting
+
+### Backend (API)
+
+* **Flask** REST API
+* Served with **Gunicorn**
+* Hosted on **Render.com**
+* Repo includes a `requirements.txt`
+
+### Frontend (UI)
+
+* **Streamlit** app (hosted separately)
+* Frontend has a single config variable like `BACKEND_URL = "https://<your-render-service>.onrender.com"` that you’ll fill in after you deploy the backend
+* Streamlit talks to Flask over HTTP (JSON for normal data + multipart for file uploads)
+
+## Core data you want to capture
+
+### Application entity
+
+* Company / role / link
+* Current status (Applied / Interview / Offer / etc.)
+* Key dates (due date, submitted date, interview date(s), etc.)
+* Notes
+
+### Deliverables
+
+* List of tasks per application:
+
+  * type (essay / question / resume / cover letter / form / other)
+  * due date
+  * current state (not started / drafting / done)
+  * optional text content (e.g., essay draft)
+
+### Writing bank
+
+* A separate “library” area to store:
+
+  * reusable essay drafts / question answers
+  * tagged or titled for search later
+
+### Documents
+
+* Upload files and attach them to an application (and possibly to a deliverable)
+* Backend stores files somewhere persistent (Render disk, or an external store like S3—implementation choice)
+
+## Implementation deliverables (code)
+
+* A backend folder with:
+
+  * `app.py` (Flask API)
+  * `requirements.txt`
+  * gunicorn entrypoint (e.g., `gunicorn app:app`)
+  * persistence layer (SQLite/Postgres) and migrations if needed
+* A frontend folder with:
+
+  * `streamlit_app.py`
+  * config variable for backend URL
+  * UI: login, list apps, create/edit app, deliverables board/list, essay bank, file upload/download
+
+If that matches what you meant, say “go ahead” and I’ll start by generating:
+
+1. backend API + DB schema + auth + limits enforcement
+2. Streamlit UI wired to the backend
+3. deploy notes for Render + Streamlit hosting setup (just the exact steps/configs)
+
+
+
+
+
+Prompt 2: Let's remove the document upload feature for this first MVP and we can think about implementing it later. Go ahead and code the first draft
+
+
+
+
+
+Prompt 3: A few prompts where I ask ChatGPT to explain some of the features like the Render Postgres DB and JWT SECRET
+
+Prompt 4: Some back and forth on deploying the backend to render (had some issues with git commits and then using Python 3.14 that needed to be fixed)
+
+Prompt 5: Alright, looks like the website is up and running on streamlit, however I'm running into some issues when trying to do stuff with the site. I get this error seen above. Could this be because the backend page is not spun up correctly, or there is some issue with the database? 
+
+Response 5: That error is **not a database problem** and it’s very unlikely to be “Render not spun up.” It’s a **JWT token issue** coming from the backend.
+
+### Why you’re seeing `{"msg":"Subject must be a string"}`
+
+In JWT land, the “subject” claim (`sub`) is supposed to be a **string**. In our backend, we did:
+
+```python
+create_access_token(identity={"user_id": u.id, "email": u.email})
+```
+
+That makes `identity` a **dict**, and `Flask-JWT-Extended` (via PyJWT) tries to store it in `sub`. Newer PyJWT versions enforce that `sub` must be a string → hence: **“Subject must be a string”**.
+
+So: ✅ backend is running, ✅ DB can be fine, ❌ auth token format is wrong.
+
+---
+
+## Fix: make JWT identity a string (store extra info as claims)
+
+### 1) Update token creation in `backend/app.py`
+
+Change both **register** and **login** to:
+
+```python
+token = create_access_token(
+    identity=str(u.id),
+    additional_claims={"email": u.email}
+)
+```
+
+So in `/auth/register` and `/auth/login`, replace the current `create_access_token(...)` call with that.
+
+### 2) Update all routes that read `get_jwt_identity()`
+
+Right now you do:
+
+```python
+ident = get_jwt_identity()
+user_id = ident["user_id"]
+```
+
+After the fix, `get_jwt_identity()` will return a string user id, so do:
+
+```python
+user_id = int(get_jwt_identity())
+```
+
+You’ll need to change this in every route that currently does `ident = ...`.
+
+---
+
+## After deploying the fix
+
+* Redeploy backend on Render
+* In Streamlit: **log out and log back in** (old tokens will be invalid / still wrong)
+* Then try “Add writing” again
+
+---
+
+## Quick “diff-style” summary
+
+**Before**
+
+* `identity = {user_id, email}` (dict) ❌
+
+**After**
+
+* `identity = "123"` (string) ✅
+* `email` stored in JWT claims ✅
+
+---
+
+If you want, paste your current `auth/login` + one protected route (like `/writing`) and I’ll mark exactly the lines to change, but the steps above are the whole root cause/fix.
+
+
+
+Prompt 6: Ok, that worked, but I'm getting a frontend error from streamlit, here are the logs: [22:22:28] 🐍 Python dependencies were installed from /mount/src/jobtrackerhw4/frontend/requirements.txt using uv.
+
+Check if streamlit is installed
+
+Streamlit is already installed
+
+[22:22:29] 📦 Processed dependencies!
+
+
+
+
+[22:24:06] 🐙 Pulling code changes from Github...
+
+[22:24:06] 📦 Processing dependencies...
+
+[22:24:06] 📦 Processed dependencies!
+
+[22:24:08] 🔄 Updated app!
+
+[22:31:12] 🐙 Pulling code changes from Github...
+
+[22:31:12] 📦 Processing dependencies...
+
+[22:31:12] 📦 Processed dependencies!
+
+[22:31:14] 🔄 Updated app!
+
+[22:33:54] 🐙 Pulling code changes from Github...
+
+[22:33:55] 📦 Processing dependencies...
+
+[22:33:55] 📦 Processed dependencies!
+
+[22:33:56] 🔄 Updated app!
+
+────────────────────── Traceback (most recent call last) ───────────────────────
+
+  /home/adminuser/venv/lib/python3.12/site-packages/streamlit/runtime/scriptru  
+
+  nner/exec_code.py:85 in exec_func_with_error_handling                         
+
+                                                                                
+
+  /home/adminuser/venv/lib/python3.12/site-packages/streamlit/runtime/scriptru  
+
+  nner/script_runner.py:576 in code_to_exec                                     
+
+                                                                                
+
+  /mount/src/jobtrackerhw4/frontend/streamlit_app.py:330 in <module>            
+
+                                                                                
+
+    327 │   │   │   │   │   │   │   │   │   │   │   content2 = st.text_area("C  
+
+    328 │   │   │   │   │   │   │   │   │   │   │   is_done2 = st.checkbox("Do  
+
+    329 │   │   │   │   │   │   │   │   │   │   │                               
+
+  ❱ 330 │   │   │   │   │   │   │   │   │   │   │   c1, c2 = st.columns([1, 1]  
+
+    331 │   │   │   │   │   │   │   │   │   │   │   save = c1.form_submit_butt  
+
+    332 │   │   │   │   │   │   │   │   │   │   │   delete = c2.form_submit_bu  
+
+    333                                                                         
+
+                                                                                
+
+  /home/adminuser/venv/lib/python3.12/site-packages/streamlit/runtime/metrics_  
+
+  util.py:408 in wrapped_func                                                   
+
+                                                                                
+
+    405 │   │   │   │   # the telemetry never causes any issues.                
+
+    406 │   │   │   │   _LOGGER.debug("Failed to collect command telemetry", e  
+
+    407 │   │   try:                                                            
+
+  ❱ 408 │   │   │   result = non_optional_func(*args, **kwargs)                 
+
+    409 │   │   except RerunException as ex:                                    
+
+    410 │   │   │   # Duplicated from below, because static analysis tools get  
+
+    411 │   │   │   # by deferring the rethrow.                                 
+
+                                                                                
+
+  /home/adminuser/venv/lib/python3.12/site-packages/streamlit/elements/layouts  
+
+  .py:328 in columns                                                            
+
+                                                                                
+
+    325 │   │   block_proto.horizontal.gap = gap_size                           
+
+    326 │   │   row = self.dg._block(block_proto)                               
+
+    327 │   │   total_weight = sum(weights)                                     
+
+  ❱ 328 │   │   return [row._block(column_proto(w / total_weight)) for w in we  
+
+    329 │                                                                       
+
+    330 │   @gather_metrics("tabs")                                             
+
+    331 │   def tabs(self, tabs: Sequence[str]) -> Sequence[DeltaGenerator]:    
+
+                                                                                
+
+  /home/adminuser/venv/lib/python3.12/site-packages/streamlit/delta_generator.  
+
+  py:509 in _block                                                              
+
+                                                                                
+
+    506 │   │   block_type = block_proto.WhichOneof("type")                     
+
+    507 │   │   # Convert the generator to a list, so we can use it multiple t  
+
+    508 │   │   ancestor_block_types = list(dg._ancestor_block_types)           
+
+  ❱ 509 │   │   _check_nested_element_violation(self, block_type, ancestor_blo  
+
+    510 │   │                                                                   
+
+    511 │   │   if dg._root_container is None or dg._cursor is None:            
+
+    512 │   │   │   return dg                                                   
+
+                                                                                
+
+  /home/adminuser/venv/lib/python3.12/site-packages/streamlit/delta_generator.  
+
+  py:762 in _check_nested_element_violation                                     
+
+                                                                                
+
+    759 │   │   │   │   "Columns cannot be placed inside other columns in the   
+
+    760 │   │   │   )                                                           
+
+    761 │   │   if num_of_parent_columns > 1:                                   
+
+  ❱ 762 │   │   │   raise StreamlitAPIException(                                
+
+    763 │   │   │   │   "Columns can only be placed inside other columns up to  
+
+    764 │   │   │   )                                                           
+
+    765 │   if block_type == "chat_message" and block_type in ancestor_block_t  
+
+────────────────────────────────────────────────────────────────────────────────
+
+StreamlitAPIException: Columns can only be placed inside other columns up to one
+
+level of nesting.
+
+
+Response 6: That’s a **pure Streamlit layout rule**, not your backend/DB.
+
+### What the error means
+
+Streamlit only allows **one level** of `st.columns()` nesting. Somewhere you have:
+
+* `st.columns(...)`
+
+  * inside one of those columns
+
+    * inside another `st.columns(...)`  ✅ (this is already 1 level)
+
+      * and then you call **another** `st.columns(...)` ❌ (this becomes 2+ levels)
+
+Your traceback points to line ~330 inside the deliverables editor where you do:
+
+```python
+c1, c2 = st.columns([1, 1])
+```
+
+That line is occurring **inside an expander → inside a form → inside a column that’s already inside another column layout**, so Streamlit throws that exception.
+
+---
+
+## Fix (simplest): remove the nested columns in that form
+
+Replace this block:
+
+```python
+c1, c2 = st.columns([1, 1])
+save = c1.form_submit_button("Save")
+delete = c2.form_submit_button("Delete")
+```
+
+with:
+
+```python
+save = st.form_submit_button("Save")
+delete = st.form_submit_button("Delete")
+```
+
+(Buttons will stack vertically, but it will work immediately.)
+
+### Do the same fix anywhere else you use `st.columns()` inside an already-columned area
+
+In our app, you’ll likely have similar `c1, c2 = st.columns(...)` inside:
+
+* deliverable expander edit form
+* writing bank expander edit form
+* maybe application edit form (depending on nesting)
+
+---
+
+## Fix (still nice UI): use `st.form_submit_button` + `st.button` outside the form
+
+Streamlit forms have limitations. If you really want side-by-side buttons, do this pattern:
+
+```python
+with st.form("edit_deliv"):
+    # inputs...
+    save = st.form_submit_button("Save")
+
+# outside the form (no nested columns here)
+delete = st.button("Delete deliverable")
+```
+
+That avoids nesting constraints and keeps behavior clear (save submits form, delete is separate).
+
+---
+
+## What I recommend you do right now
+
+1. In `frontend/streamlit_app.py`, search for `form_submit_button("Delete")`
+2. Any place you see it wrapped in `st.columns()` inside a form inside a column, flatten it (no columns).
+3. Redeploy Streamlit.
+
+If you paste ~20 lines around `streamlit_app.py:320–340`, I’ll rewrite that exact section in-place so you can copy/paste it without hunting.
