@@ -237,7 +237,10 @@ def register():
         db.commit()
         db.refresh(u)
 
-        token = create_access_token(identity={"user_id": u.id, "email": u.email})
+        token = create_access_token(
+            identity=str(u.id),
+            additional_claims={"email": u.email}
+        )
         return jsonify({"access_token": token, "user": {"id": u.id, "email": u.email}}), 201
     finally:
         db.close()
@@ -254,7 +257,10 @@ def login():
         if not u or not check_password_hash(u.password_hash, password):
             return jsonify({"error": "Invalid credentials"}), 401
 
-        token = create_access_token(identity={"user_id": u.id, "email": u.email})
+        token = create_access_token(
+            identity=str(u.id),
+            additional_claims={"email": u.email}
+        )
         return jsonify({"access_token": token, "user": {"id": u.id, "email": u.email}})
     finally:
         db.close()
