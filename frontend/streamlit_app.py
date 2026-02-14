@@ -8,7 +8,7 @@ from datetime import datetime
 # CONFIG: set this after deploying backend on Render
 # Example: BACKEND_URL = "https://your-service.onrender.com"
 # -------------------------------------------------------
-BACKEND_URL = os.environ.get("BACKEND_URL", "https://YOUR-RENDER-URL-HERE")
+BACKEND_URL = os.environ.get("BACKEND_URL", "https://jobtrackerhw4.onrender.com")
 
 st.set_page_config(page_title="Job Application Tracker", layout="wide")
 
