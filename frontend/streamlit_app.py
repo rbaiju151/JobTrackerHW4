@@ -238,6 +238,51 @@ with tab[0]:
                         else:
                             st.error(rr.json().get("error", rr.text))
 
+                st.divider()
+                st.subheader("AI Interview Prep Assistant")
+                st.info(f"Chat with an AI that knows your {a['company']} application details.")
+
+                # 1. Initialize session state tied to the specific application
+                if "chat_app_id" not in st.session_state or st.session_state.chat_app_id != a['id']:
+                    st.session_state.chat_app_id = a['id']
+                    st.session_state.chat_history = []
+
+                # 2. Display existing chat history
+                for msg in st.session_state.chat_history:
+                    # Map Gemini's 'model' role back to Streamlit's 'assistant' role for icons
+                    role = "assistant" if msg["role"] == "model" else "user"
+                    with st.chat_message(role):
+                        st.markdown(msg["parts"])
+
+                # 3. Chat Input mechanism
+                if prompt := st.chat_input("Ask for mock questions, resume tips, or advice..."):
+                    
+                    # Show the user's message immediately
+                    with st.chat_message("user"):
+                        st.markdown(prompt)
+
+                    # Prepare history format for the API (Gemini uses "user" and "model")
+                    api_history = [{"role": m["role"], "parts": m["parts"]} for m in st.session_state.chat_history]
+                    
+                    # Add user message to local state
+                    st.session_state.chat_history.append({"role": "user", "parts": prompt})
+
+                    # Call backend API
+                    with st.chat_message("assistant"):
+                        with st.spinner("Thinking..."):
+                            payload = {
+                                "message": prompt,
+                                "history": api_history
+                            }
+                            r_chat = api_post(f"/applications/{a['id']}/chat", json=payload)
+                            
+                            if r_chat.status_code == 200:
+                                reply = r_chat.json().get("reply")
+                                st.markdown(reply)
+                                # Append AI response to local state
+                                st.session_state.chat_history.append({"role": "model", "parts": reply})
+                            else:
+                                st.error(r_chat.json().get("error", "Failed to connect to AI assistant."))
 # ---------------------------
 # Deliverables tab
 # ---------------------------

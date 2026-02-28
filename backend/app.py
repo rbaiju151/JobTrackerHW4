@@ -12,6 +12,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from werkzeug.security import generate_password_hash, check_password_hash
+import google.generativeai as genai
 
 # -----------------------
 # Config
@@ -30,6 +31,9 @@ DEFAULT_STATUSES = [
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///jobtracker.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-change-me")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+genai.configure(api_key=GEMINI_API_KEY) # This line activates the api key stored as an environment variable in Render
 
 # Render sometimes provides postgres URLs like postgres:// -> needs postgresql:// for SQLAlchemy
 if DATABASE_URL.startswith("postgres://"):
@@ -407,6 +411,60 @@ def delete_application(app_id: int):
     finally:
         db.close()
 
+# This is my main manual coded section. I did my best to use a similar format to the earlier functions AI had helped me create because they both worked well and because 
+# much of the code is standard stuff for interacting with the Postgres db, handling incoming data from the frontend, etc. I did have AI look at it and help me with it, but I can 
+# confidently explain what each line does in detail
+
+@app.post("/applications/<int:app_id>/chat") # Creates new URL endpoint, uses dynamic link to match application ID based on what application you are chatting about
+@jwt_required() # Uses the jwt authentication to ensure the user is logged in with valid credentials that are stored in the database
+def application_chat(app_id: int):
+    user_id = int(get_jwt_identity()) # Actually pulls the credentials and ensures we are using the right data associated with the logged in account
+    data = request.get_json(force=True) or {} # Parses data coming from the frontend as json, force=True forces the method to read it as json even if not. Returns empty dictionary is data from frontend is empty
+    
+    user_message = data.get("message") # Pulls the latest message the user sent to the chatbot from the data variable
+    chat_history = data.get("history", []) # Pulls chat history to parse into Gemini, returns empty list if this is the first message
+
+    if not user_message: # Added these later as debugging checks to help me solve issues. if either the user message or the api key is not filled, instead of crashing these give a clean error message
+        return jsonify({"error": "Message is required"}), 400
+    if not GEMINI_API_KEY:
+        return jsonify({"error": "GEMINI_API_KEY is not configured on the server."}), 500
+
+    db = SessionLocal() # connection to Postgres db
+    try: # use try except framework as with the rest of the app to handle errors
+        a = db.query(Application).filter(Application.id == app_id, Application.user_id == user_id).first() # Query the database to pull the correct application, checking that it is both the right application and associated with the logged in user. Use .first() to extract the first application that matches these requirements to avoid SQL returning a list
+        if not a: # If a is empty, ie. the application could not be found for some reason, we return an error
+            return jsonify({"error": "Application not found"}), 404
+
+        deliverables = db.query(Deliverable).filter(Deliverable.application_id == app_id).all() # Grab all the deliverables associated with the application as a list
+        deliv_texts = [f"-> {d.title} ({d.dtype}). Due: {d.due_date}. State: {d.state}." for d in deliverables] # List comprehension to format each deliverable to feed to Gemini
+        deliv_str = "\n".join(deliv_texts) if deliv_texts else "No deliverables added yet." # Formats as one big strong to give to Gemini
+
+        
+        # Take the information in application, deliverables, and notes to build a system prompt that we can give to Gemini alongside the first chat. Essentially gives Gemini context without the user needing to tell it about the application
+        # Use Persona, Task, Context, Format structure to build prompt
+        system_instruction = f"""
+        You are an expert interview prep assistant and career coach. Help the user prepare for their interview and hiring process by taking a look at the following notes/info.
+        Here is the context of the job application:
+        - Company: {a.company}
+        - Role: {a.role}
+        - Current Status: {a.status}
+        - User's Notes on the job: {a.notes or 'None provided.'}
+        
+        Current Deliverables for this application:
+        {deliv_str}
+
+        Use this information to give tailored advice, mock interview questions, or next-step recommendations. Be concise, encouraging, and highly specific to the company and role provided. Utilize external research on the company and up to date interview/job search methods
+        """
+
+        model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=system_instruction) # Use the free Gemini model and pass through the system prompt from above
+        chat = model.start_chat(history=chat_history) # Boot the chat and pass through the previous chat history we pulled earlier from the JSON data
+        response = chat.send_message(user_message) # Receive response from the model
+
+        return jsonify({"reply": response.text}) # Package response as json data for the frontend to read
+    except Exception as e: # If we get any errors, assign the Exception to the variable e
+        return jsonify({"error": str(e)}), 500 # Package the exception for the frontend to display. Improvement would be to handle specific errors that are likely to occur for more precise debugging on the frontend
+    finally: # Close the connection to the db either way so we don't crash anything
+        db.close()
 # -----------------------
 # Deliverables
 # -----------------------
