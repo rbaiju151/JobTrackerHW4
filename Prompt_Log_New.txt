@@ -1,0 +1,44 @@
+Prompt 1: 
+Ok, so I would like to start improving the app. I am giving you the current backend and frontend code. The first feature I would like to add is an AI chatbot feature that can take in your application details, notes, and deliverables and help you prep for your interview. Before we start with the code, give me an overview of what we will need to code in order to get this done, what external requirements I need to fulfill, and how this impacts the current website structure.
+
+Response 1: Gemini said
+This is a fantastic feature to add. It highly leverages the data you are already collecting and Streamlit’s native chat elements (st.chat_message and st.chat_input) make building the frontend interface incredibly fast.
+
+Since you are aiming for a 3-4 hour build time, keeping the chat history ephemeral (meaning it clears when you refresh the page or switch applications) is the best approach. It saves you from needing to modify your database schema or build complex chat history retrieval logic.
+
+Here is an overview of what we need to build, what you need to gather, and how it will impact your current architecture.
+
+External Requirements
+An LLM API Key: You will need an active API key from a provider like OpenAI, Anthropic, or Google (Gemini).
+
+Environment Variables: You will need to securely add this API key to your local .env file and to your Render environment variables.
+
+New Python Packages: Depending on the provider you choose, you will need to add their SDK (e.g., openai or google-generativeai) to your requirements.txt.
+
+Backend Updates (app.py)
+A New Endpoint: We need to create a new route, likely something like POST /applications/<app_id>/chat.
+
+Context Gathering Logic: Within that endpoint, we will write SQLAlchemy queries to fetch the specific application, its deliverables, and its notes.
+
+Prompt Engineering: We will need to write logic that formats all that database information into a hidden "System Prompt" so the AI knows exactly what company and role it is helping you prep for.
+
+API Integration: The endpoint will take the user's chat message, append it to the context, send it to the LLM, and return the AI's response to the frontend.
+
+Frontend Updates (streamlit_app.py)
+New UI Component: We will add a new section inside the Applications tab (or perhaps a brand new "Interview Prep" tab) that triggers when an application is selected.
+
+State Management: We need to utilize st.session_state to store the back-and-forth chat messages so the conversation remains visible on the screen as you chat.
+
+API Calls: We will write a function to send the user's prompt to your new backend endpoint and display the returned response using st.chat_message.
+
+Impact on Current Website Structure
+Database: Zero impact. By keeping the chat ephemeral, we don't need to touch your Postgres models at all.
+
+Backend: Low impact. We are just adding one isolated route. Existing CRUD operations remain untouched.
+
+Frontend: Medium impact. We will need to adjust your layout slightly to make room for the chat window. A good strategy is to place the chat interface directly below the "Edit application" form on the main applications tab so you can look at your notes while chatting.
+
+Would you like to use OpenAI, Gemini, or another provider for this? Once you decide, I can write out the exact backend endpoint and frontend Streamlit code for you to paste in.
+
+
+Prompt 2: 
