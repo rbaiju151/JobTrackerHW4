@@ -13,6 +13,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from werkzeug.security import generate_password_hash, check_password_hash
 from google import genai
+from google.genai import types
 
 # -----------------------
 # Config
@@ -33,7 +34,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///jobtracker.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-change-me")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-genai.configure(api_key=GEMINI_API_KEY) # This line activates the api key stored as an environment variable in Render
+ai_client = genai.Client(api_key=GEMINI_API_KEY) # This line activates the api key stored as an environment variable in Render
 
 # Render sometimes provides postgres URLs like postgres:// -> needs postgresql:// for SQLAlchemy
 if DATABASE_URL.startswith("postgres://"):
@@ -456,11 +457,25 @@ def application_chat(app_id: int):
         Use this information to give tailored advice, mock interview questions, or next-step recommendations. Be concise, encouraging, and highly specific to the company and role provided. Utilize external research on the company and up to date interview/job search methods
         """
 
-        model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=system_instruction) # Use the free Gemini model and pass through the system prompt from above
-        chat = model.start_chat(history=chat_history) # Boot the chat and pass through the previous chat history we pulled earlier from the JSON data
-        response = chat.send_message(user_message) # Receive response from the model
+        formatted_history = [] # Define a formatted chat istory list, as this is how gemini takes input
+        for msg in chat_history: # Parse each message in chat_history
+            formatted_history.append( # Append the chat to the formatted_history list
+                types.Content(role=msg["role"], # Content is a data structure the google.genai SDk uses to store content. We define role so Gemini knows who gave each response (user or model). chat_history is a list of dictionaries.
+                              parts=[types.Part.from_text(text=msg["parts"])]) # Parts is a data structure under Content that allows you to build the Content data structure with text responses. from_text method allows you to pass text data from chat_history
+            )
+        
+        chat = ai_client.chats.create( # Creates a new chat using the earlier define ai_client variable
+            model="gemini-1.5-flash", # Selects the free model
+            history=formatted_history, # Passes the formatted histroy we created
+            config=types.GenerateContentConfig( # Allows us to pass our system prompt in a Content structure
+                system_instruction=system_instruction,
+            )
+        )
+
+        response = chat.send_message(user_message) # Send the new chat
 
         return jsonify({"reply": response.text}) # Package response as json data for the frontend to read
+    
     except Exception as e: # If we get any errors, assign the Exception to the variable e
         return jsonify({"error": str(e)}), 500 # Package the exception for the frontend to display. Improvement would be to handle specific errors that are likely to occur for more precise debugging on the frontend
     finally: # Close the connection to the db either way so we don't crash anything
