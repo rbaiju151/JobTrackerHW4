@@ -42,3 +42,66 @@ Would you like to use OpenAI, Gemini, or another provider for this? Once you dec
 
 
 Prompt 2: 
+Now that I have built my backend code, I would like you to help me build the frontend code that will package JSON data to be passed into the chatbot integration. Here is my code [code]
+
+Response 2:
+
+Got it. You're already thinking ahead with the frontend being able to package JSON data. Here is new code for the frontend.
+
+Frontend Updates (streamlit_app.py)
+
+We are going to inject the chat UI directly into your main Applications tab so that the user can chat while looking at their application data.
+
+Find the Applications tab section in your code (with tab[0]:), specifically inside with colA: where you display the application details. Paste this new code block directly after the delete button logic in the "Edit application" form:
+
+# ... (existing delete button logic ends here)
+                
+                # --- NEW: AI Chatbot UI ---
+                st.divider()
+                st.subheader("🤖 AI Interview Prep Assistant")
+                st.info(f"Chat with an AI that knows your {a['company']} application details.")
+
+                # 1. Initialize session state tied to the specific application
+                if "chat_app_id" not in st.session_state or st.session_state.chat_app_id != a['id']:
+                    st.session_state.chat_app_id = a['id']
+                    st.session_state.chat_history = []
+
+                # 2. Display existing chat history
+                for msg in st.session_state.chat_history:
+                    # Map Gemini's 'model' role back to Streamlit's 'assistant' role for icons
+                    role = "assistant" if msg["role"] == "model" else "user"
+                    with st.chat_message(role):
+                        st.markdown(msg["parts"])
+
+                # 3. Chat Input mechanism
+                if prompt := st.chat_input("Ask for mock questions, resume tips, or advice..."):
+                    
+                    # Show the user's message immediately
+                    with st.chat_message("user"):
+                        st.markdown(prompt)
+
+                    # Prepare history format for the API (Gemini uses "user" and "model")
+                    api_history = [{"role": m["role"], "parts": m["parts"]} for m in st.session_state.chat_history]
+                    
+                    # Add user message to local state
+                    st.session_state.chat_history.append({"role": "user", "parts": prompt})
+
+                    # Call backend API
+                    with st.chat_message("assistant"):
+                        with st.spinner("Thinking..."):
+                            payload = {
+                                "message": prompt,
+                                "history": api_history
+                            }
+                            r_chat = api_post(f"/applications/{a['id']}/chat", json=payload)
+                            
+                            if r_chat.status_code == 200:
+                                reply = r_chat.json().get("reply")
+                                st.markdown(reply)
+                                # Append AI response to local state
+                                st.session_state.chat_history.append({"role": "model", "parts": reply})
+                            else:
+                                st.error(r_chat.json().get("error", "Failed to connect to AI assistant."))
+                # ----------------------------------------
+
+Let me know how that goes!
