@@ -8,3 +8,9 @@ The frontend uses a few different endpoints. It uses the /meta endpoint to ensur
 The backend requires a database url from Render Postgres in order to store and retrieve data. Furthermore, it requires a JWT_Secret key to properly hash the users' passwords using a new module called werkzeug.security. I can change the JWT_SECRETS variable at any time to force all users to re-login and prevent attackers from gaining access to accounts because they stole an authorization token.
 
 All needed secrets are stored on the backend by using Render's built-in environment variable storage, and is not included in the frontend code or in the git repo
+
+The newest features I added for extending this application for Project 2 are an AI Interview Assistant and Analytics dashboard.
+
+The AI assistant is integrated into the backend with a secret Gemini API key. Users can select an active application and type a message. The frontend will package the application details (company, any notes, any deliverables, etc.) and the prompt as a JSON structure. The backend then reads and formats the data, and sends a system prompt (a wrapper prompt for the AI to gain context) alongside the user message, gets a response from Gemini, and repackages it for the frontend to display. The tool is helpful since it has active knowledge of your application details without the user needing to type it all in.
+
+The Analytics Dashboard is a new tool that helps users keep track of their applications. You can see plots on how many applications you are making over time, and what applications are in what state (interview, offer, etc.). There are also analytics for total applications, applications in the past 30 days, and interview rate
