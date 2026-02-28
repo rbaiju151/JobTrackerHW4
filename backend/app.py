@@ -465,7 +465,7 @@ def application_chat(app_id: int):
             )
         
         chat = ai_client.chats.create( # Creates a new chat using the earlier define ai_client variable
-            model="gemini-1.5-flash", # Selects the free model
+            model="gemini-2.5-flash", # Selects the free model
             history=formatted_history, # Passes the formatted histroy we created
             config=types.GenerateContentConfig( # Allows us to pass our system prompt in a Content structure
                 system_instruction=system_instruction,
