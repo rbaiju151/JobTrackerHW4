@@ -3,6 +3,7 @@ import requests
 import streamlit as st
 from dateutil import parser as dateparser
 from datetime import datetime
+import pandas as pd
 
 # -------------------------------------------------------
 # CONFIG: set this after deploying backend on Render
@@ -124,7 +125,7 @@ except Exception:
 allowed_statuses = meta.get("allowed_statuses", ["Drafting", "Submitted", "Interview", "Offer", "Rejected", "Withdrawn"])
 max_apps = meta.get("max_apps_per_user", 5)
 
-tab = st.tabs(["Applications", "Deliverables", "Writing Bank"])
+tab = st.tabs(["Applications", "Deliverables", "Writing Bank", "Analytics"])
 
 # ---------------------------
 # Applications tab
@@ -470,3 +471,77 @@ with tab[2]:
                                     st.rerun()
                                 else:
                                     st.error(u.json().get("error", u.text))
+                                    
+# ---------------------------
+# Analytics tab
+# ---------------------------
+with tab[3]:
+    st.subheader("📊 Application Analytics")
+
+    # Fetch all applications
+    r = api_get("/applications")
+    if r.status_code != 200:
+        st.error("Failed to fetch applications for analytics.")
+    else:
+        apps = r.json().get("applications", [])
+        
+        if not apps:
+            st.info("No applications yet. Add some data to see your analytics!")
+        else:
+            # Convert JSON to a Pandas DataFrame for easy math
+            df = pd.DataFrame(apps)
+
+            # --- 1. Calculate Metrics ---
+            total_apps = len(df)
+
+            # Interview Rate (Applications that reached Interview or Offer stage)
+            interview_stages = ["Interview", "Offer"]
+            interviews_got = len(df[df["status"].isin(interview_stages)])
+            interview_rate = (interviews_got / total_apps) * 100 if total_apps > 0 else 0
+
+            # Applications in the last 30 days
+            recent_apps = 0
+            if "submitted_date" in df.columns:
+                # Convert strings to datetime, coerce errors to NaT (Not a Time)
+                df["submitted_date_dt"] = pd.to_datetime(df["submitted_date"], errors="coerce")
+                
+                # Remove timezones for a clean comparison
+                df["submitted_date_dt"] = df["submitted_date_dt"].dt.tz_localize(None)
+                thirty_days_ago = pd.Timestamp.now().tz_localize(None) - pd.Timedelta(days=30)
+                
+                recent_apps = len(df[df["submitted_date_dt"] >= thirty_days_ago])
+
+            # --- 2. Display Top Level Metrics ---
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Total Applications", total_apps)
+            col2.metric("Applications (Last 30 Days)", recent_apps)
+            col3.metric("Interview Rate", f"{interview_rate:.1f}%")
+
+            st.divider()
+
+            # --- 3. Display Charts ---
+            colA, colB = st.columns(2)
+
+            with colA:
+                st.markdown("**Applications by Status**")
+                # Count occurrences of each status
+                status_counts = df["status"].value_counts().reset_index()
+                status_counts.columns = ["Status", "Count"]
+                # Streamlit automatically turns this into a bar chart
+                st.bar_chart(status_counts.set_index("Status"))
+
+            with colB:
+                st.markdown("**Application Timeline**")
+                if "submitted_date_dt" in df.columns and not df["submitted_date_dt"].isna().all():
+                    # Drop rows without a submitted date for the timeline
+                    time_df = df.dropna(subset=["submitted_date_dt"]).copy()
+                    
+                    # Group by Week (Year-Week format)
+                    time_df["Week"] = time_df["submitted_date_dt"].dt.to_period("W").astype(str)
+                    timeline = time_df.groupby("Week").size().reset_index(name="Count")
+                    
+                    # Sort chronologically
+                    timeline = timeline.sort_values("Week")
+                    st.line_chart(timeline.set_index("Week"))
+                else:
+                    st.info("Add 'Submitted' dates to your applications to see your timeline chart!")
